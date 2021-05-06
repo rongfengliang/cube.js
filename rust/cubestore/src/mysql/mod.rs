@@ -2,12 +2,12 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::sql::{SqlQueryContext, SqlService};
 use crate::table::TableValue;
 use crate::util::time_span::warn_long;
-use crate::{metastore, CubeError};
+use crate::{metastore, CubeError, CubeErrorCauseType};
 use async_trait::async_trait;
 use hex::ToHex;
 use log::{error, info, warn};
 use msql_srv::*;
-use std::io;
+use std::{io, env};
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
@@ -181,7 +181,7 @@ impl ProcessingLoop for MySqlServer {
                     Backend {
                         sql_service,
                         auth,
-                        user: None,
+                        user: env::var("CUBESTORE_USERNAME").ok(),
                     },
                     socket,
                 )
@@ -228,6 +228,19 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 #[async_trait]
 impl SqlAuthService for SqlAuthDefaultImpl {
     async fn authenticate(&self, _user: Option<String>) -> Result<Option<String>, CubeError> {
-        Ok(None)
+      let m =  match _user {
+            None => {
+                println!("{}", "user is null");
+                Err(CubeError {
+                    message: "error".to_string(),
+                    cause: CubeErrorCauseType::User,
+                })
+            }
+            Some(user) => {
+                println!("auth user{}", user);
+                Ok(Some(user))
+            }
+        };
+        m
     }
 }
