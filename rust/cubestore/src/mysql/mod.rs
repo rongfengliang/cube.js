@@ -7,10 +7,10 @@ use async_trait::async_trait;
 use hex::ToHex;
 use log::{error, info, warn};
 use msql_srv::*;
-use std::{io, env};
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
+use std::{env, io};
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
@@ -240,7 +240,7 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 impl SqlAuthService for SqlAuthDefaultImpl {
     async fn authenticate(&self, _user: Option<String>) -> Result<Option<String>, CubeError> {
         let enable_auth = env_bool("CUBESTORE_AUTH_ENABLE", false);
-        if enable_auth==true {
+        if enable_auth == true {
             info!("cubestore enable auth check");
             let user = match _user {
                 None => {
@@ -249,7 +249,7 @@ impl SqlAuthService for SqlAuthDefaultImpl {
                         message: "error".to_string(),
                         cause: CubeErrorCauseType::User,
                     })
-                },
+                }
                 Some(user) => {
                     info!("auth user {}", user);
                     if user == env::var("CUBESTORE_USERNAME").ok().unwrap() {
@@ -263,7 +263,7 @@ impl SqlAuthService for SqlAuthDefaultImpl {
                 }
             };
             user
-        }else{
+        } else {
             Ok(None)
         }
     }
