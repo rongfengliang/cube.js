@@ -20,6 +20,17 @@ struct Backend {
     user: Option<String>,
 }
 
+fn env_bool(name: &str, default: bool) -> bool {
+    env::var(name)
+        .ok()
+        .map(|x| match x.as_str() {
+            "0" => false,
+            "1" => true,
+            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+        })
+        .unwrap_or(default)
+}
+
 #[async_trait]
 impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     type Error = io::Error;
@@ -181,7 +192,7 @@ impl ProcessingLoop for MySqlServer {
                     Backend {
                         sql_service,
                         auth,
-                        user: env::var("CUBESTORE_USERNAME").ok(),
+                        user: None,
                     },
                     socket,
                 )
@@ -228,19 +239,32 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 #[async_trait]
 impl SqlAuthService for SqlAuthDefaultImpl {
     async fn authenticate(&self, _user: Option<String>) -> Result<Option<String>, CubeError> {
-      let m =  match _user {
-            None => {
-                println!("{}", "user is null");
-                Err(CubeError {
-                    message: "error".to_string(),
-                    cause: CubeErrorCauseType::User,
-                })
-            }
-            Some(user) => {
-                println!("auth user{}", user);
-                Ok(Some(user))
-            }
-        };
-        m
+        let enable_auth = env_bool("CUBESTORE_AUTH_ENABLE", false);
+        if enable_auth==true {
+            info!("cubestore enable auth check");
+            let user = match _user {
+                None => {
+                    info!("{}", "user is null");
+                    Err(CubeError {
+                        message: "error".to_string(),
+                        cause: CubeErrorCauseType::User,
+                    })
+                },
+                Some(user) => {
+                    info!("auth user {}", user);
+                    if user == env::var("CUBESTORE_USERNAME").ok().unwrap() {
+                        Ok(None)
+                    } else {
+                        Err(CubeError {
+                            message: "error".to_string(),
+                            cause: CubeErrorCauseType::User,
+                        })
+                    }
+                }
+            };
+            user
+        }else{
+            Ok(None)
+        }
     }
 }
